@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "outDir": "./public/dist/",
+    "noImplicitAny": true,
+    "allowJs": false,
+    "lib": ["es6", "dom"],
+    "types": ["node"],
+    "typeRoots": ["./node_modules/typescript/lib/lib.dom.d.ts"],
+    "allowSyntheticDefaultImports": true
+  }
+}

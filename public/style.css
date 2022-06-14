@@ -1,0 +1,22 @@
+#app {
+    width: 100%;
+    display: block;
+    /* position: absolute; */
+    top: 42px;
+    height: calc(100% - 42px);
+    max-width: 800px;
+    margin: 0px auto;
+}
+
+#app #loading {
+    width: 100%;
+    text-align: center;
+    padding-top: 150px;
+}
+
+#app .title {
+    text-align: center;
+    margin: 0px auto;
+    padding-top: 10px;
+    padding-bottom: 20px;
+}
