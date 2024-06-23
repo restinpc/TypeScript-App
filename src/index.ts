@@ -1,15 +1,9 @@
 /**
  * TypeScript Application - Application index.
  *
- * 1.0.0 # Aleksandr Vorkunov <developing@nodes-tech.ru>
+ * 1.0.1 # Aleksandr Vorkunov <developing@nodes-tech.ru>
  */
 
-import App, { IApp } from "./app";
+import App from "./app";
 
-window.addEventListener("load", () => {
-    console.log("Application is loading...");
-    const app: IApp = new App();
-    // @ts-ignore
-    document["application"] = app.document;
-    console.log("Application is started!");
-});
+new App();

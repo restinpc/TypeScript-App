@@ -1,16 +1,16 @@
 /**
  * TypeScript Application - Virtual DOM element primary component.
  *
- * 1.0.0 # Aleksandr Vorkunov <developing@nodes-tech.ru>
+ * 1.0.1 # Aleksandr Vorkunov <developing@nodes-tech.ru>
  */
 
 import App from "../app";
-import { IAppState } from "../app";
-
-const DEBUG: boolean = process.env && process.env.DEBUG && process.env.DEBUG === "true" ? true : false;
+import { IAppState } from "../interfaces";
+// @ts-ignore
+const DEBUG: boolean = process.env && process.env.DEBUG && process.env.DEBUG == "true";
 
 /**
- * @property application Application object
+ * @property app Application object
  * @property name Component name.
  * @property parent Virtual DOM parent node.
  * @property nodes Array with a child nodes.
@@ -20,7 +20,7 @@ const DEBUG: boolean = process.env && process.env.DEBUG && process.env.DEBUG ===
  * @property mapStateToProps Function to map object properties from application state container.
  */
 class DOMElement {
-    application: App;
+    app: App;
     name: string;
     parent: DOMElement;
     nodes: DOMElement[];
@@ -32,7 +32,7 @@ class DOMElement {
     defaultProps: any;
     /**
      * @constructor
-     * @param application Application object.
+     * @param app Application object.
      * @param tag Component </>
      * @param parent Virtual DOM parent node.
      * @param name Component name.
@@ -48,7 +48,7 @@ class DOMElement {
         defaultProps?: {},
     ) {
         if (DEBUG && name) {
-            console.log(`DOMElement.constructor(<${ tag } name="${ name }"/>)`);
+            application.handler.log(`DOMElement.constructor(<${ tag } name="${ name }"/>)`);
         }
         this.renderId = 0;
         this.name = name ? name : "";
@@ -56,13 +56,14 @@ class DOMElement {
         this.element = document.createElement(tag);
         // @ts-ignore
         this.element.ref = this;
-        this.application = application;
+        this.app = application;
         this.parent = parent;
         this.props = {};
         this.defaultProps = defaultProps;
         this.mapStateToProps = mapStateToProps;
         this.nodes = [];
-        this.application.DOMObjects.push(this);
+        this.app.DOMObjects.push(this);
+        this.updateProps();
     }
 
     /**
@@ -80,14 +81,14 @@ class DOMElement {
             if (this.mapStateToProps && typeof this.mapStateToProps === "function") {
                 this.props = {
                     ...this.defaultProps,
-                    ...this.mapStateToProps(this.application.state)
+                    ...this.mapStateToProps(this.app.state)
                 };
             } else {
                 this.props = this.defaultProps;
             }
         } else if (this.mapStateToProps && typeof this.mapStateToProps === "function") {
             this.props = {
-                ...this.mapStateToProps(this.application.state)
+                ...this.mapStateToProps(this.app.state)
             };
         }
         return this.props;
@@ -95,17 +96,12 @@ class DOMElement {
 
     /**
      * Method to update child nodes while capturing.
-     * @param fout Target HTML Element.
      */
-    fallback(fout:HTMLElement) {
+    renderNodes() {
         this.nodes.forEach((node: DOMElement, index: number) => {
             if (this.getNodes().indexOf(node) >= 0) {
-                node.render(fout);
-                if (node.nodes.length) {
-                    node.nodes.forEach((childNode: DOMElement) => {
-                        childNode.render(node.element);
-                    })
-                }
+                this.updateProps();
+                node.render(this.element);
                 if (this.element.childNodes[index]) {
                     this.element.childNodes[index].replaceWith(node.element);
                 }
@@ -136,6 +132,24 @@ class DOMElement {
             }
         }
     }
+    
+    parseProps() {
+        const fout: HTMLElement = this.element;
+        Object.keys(this.props).forEach((key: string) => {
+            if (key === "innerHTML") {
+                fout.innerHTML = this.props[key];
+            } else if (key === "className") {
+                fout.className = this.props[key];
+            } else if (key === "onClick") {
+                fout.onclick = this.props[key];
+            } else if (this.props[key]) {
+                fout.setAttribute(key, this.props[key]);
+            }
+        });
+        if (this.name) {
+            fout.setAttribute("name", this.name);
+        }
+    }
 
     /**
      * Method to output html content to parent node.
@@ -144,29 +158,14 @@ class DOMElement {
     render (stdout: HTMLElement): void {
         try {
             if (DEBUG && this.name) {
-                console.log(`DOMElement(<${ this.tag } name="${this.name}"/>).render(${ this.renderId })`);
+                this.app.handler.log(`DOMElement(<${ this.tag } name="${this.name}"/>).render(${ this.renderId })`);
             }
             this.renderId++;
-            this.updateProps();
-            const fout: HTMLElement = this.element;
-            Object.keys(this.props).forEach((key: string) => {
-                if (key === "innerHTML") {
-                    fout.innerHTML = this.props[key];
-                } else if (key === "className") {
-                    fout.className = this.props[key];
-                } else if (key === "onClick") {
-                    fout.onclick = this.props[key];
-                } else if (this.props[key]) {
-                    fout.setAttribute(key, this.props[key]);
-                }
-            });
-            if (this.name) {
-                fout.setAttribute("name", this.name);
-            }
-            this.fallback(fout);
+            this.parseProps();
+            this.renderNodes();
             this.output(stdout);
         } catch (e) {
-            console.error(`DOMElement(<${ this.tag } name="${this.name}"/>).render(${ this.renderId }) -> ${ e.message }`);
+            this.app.handler.error(`DOMElement(<${ this.tag } name="${this.name}"/>).render(${ this.renderId }) -> ${ e.message }`);
         }
     };
 
@@ -176,7 +175,7 @@ class DOMElement {
      */
     addChild (child:DOMElement): void {
         if (DEBUG && this.name && child.name) {
-            console.log(`DOMElement(${ this.name }).addChild(${ child.name })`);
+            this.app.handler.log(`DOMElement(${ this.name }).addChild(${ child.name })`);
         }
         this.nodes.push(child);
         if (this.getNodes().indexOf(child) >= 0) {
@@ -190,7 +189,7 @@ class DOMElement {
      */
     removeChild (child:DOMElement): void {
         if (DEBUG && this.name) {
-            console.log(`DOMElement(${ this.name }).removeChild(${ child.name })`);
+            this.app.handler.log(`DOMElement(${ this.name }).removeChild(${ child.name })`);
         }
         const arr: DOMElement[] = [];
         this.nodes.forEach((node:DOMElement) => {

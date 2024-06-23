@@ -1,18 +1,21 @@
 /**
  * TypeScript Application - Virtual DOM smart container.
  *
- * 1.0.0 # Aleksandr Vorkunov <developing@nodes-tech.ru>
+ * 1.0.1 # Aleksandr Vorkunov <developing@nodes-tech.ru>
  */
 
+import App from "../app";
 import DOMElement from "./element";
-import { IDOMContainer } from "../interfaces";
-import Step2View from "../views/step2";
-import Step1View from "../views/step1";
-
-const DEBUG: boolean = process.env && process.env.DEBUG && process.env.DEBUG === "true" ? true : false;
+import {
+    IAppState,
+    IDOMContainer,
+    IView
+} from "../interfaces";
+// @ts-ignore
+const DEBUG: boolean = process.env && process.env.DEBUG && process.env.DEBUG == "true";
 
 /**
- * @property application Application object
+ * @property app Application object
  * @property name Component name.
  * @property parent Virtual DOM parent node.
  * @property nodes Array with a child nodes.
@@ -23,45 +26,88 @@ const DEBUG: boolean = process.env && process.env.DEBUG && process.env.DEBUG ===
  * @property step Current form step (1/2)
  */
 class DOMContainer extends DOMElement implements IDOMContainer {
-    step1: DOMElement;
-    step2: DOMElement;
+    element: HTMLDivElement;
+    loaded: boolean;
+    childNodes: { [key: string]: DOMElement }
+    /**
+     * @constructor
+     * @overrider
+     */
+     constructor(
+        application: App,
+        tag: string,
+        parent: DOMElement = null,
+        name?: string,
+        mapStateToProps?: (state:IAppState) => {} | null,
+        defaultProps?: {},
+    ) {
+        // @ts-ignore
+        super(...arguments);
+        this.childNodes = {};
+        this.loaded = false;
+    }
+    
     /**
      * @override
      */
     getNodes(): DOMElement[] {
-        const arr: DOMElement[] = [];
-        this.nodes.forEach((node: DOMElement) => {
-            if (node.name.indexOf('step') < 0 || node.name === `step${this.props.step}`) {
-                arr.push(node);
+        const nodes: DOMElement[] = [];
+        this.props.views.forEach((view:IView) => {
+            if (view.condition) {
+                this.nodes.forEach((node:DOMElement) => {
+                    if (node.name === view.name) {
+                        nodes.push(node);
+                    }
+                });
             }
         });
-        return arr;
+        return nodes;
     }
-
-    /**
-     * @override
-     * @param stdout
-     */
-    render(stdout: HTMLElement) {
+    
+    parseProps() {
+        super.parseProps();
+        if (this.props.views && this.props.views.length) {
+            let arr:IView[] = [];
+            this.props.views.forEach((view:IView) => {
+                if (view.condition()) {
+                    arr.push(view);
+                }
+            });
+            let flag;
+            do {
+                flag = false;
+                for (let i = this.nodes.length - 1; i >= 0; i--) {
+                    let flag = false;
+                    arr.forEach((el:IView) => {
+                        if (this.nodes[i] && el.name === this.nodes[i].name) {
+                            flag = true;
+                        }
+                    });
+                    if (!flag) {
+                        this.removeChild(this.nodes[i]);
+                        flag = true;
+                        break;
+                    }
+                }
+            } while(flag);
+            arr.forEach((view:IView) => {
+                if (!this.childNodes || !this.childNodes[view.name]) {
+                    this.childNodes[view.name] = view.content(this.app, this);
+                } else {
+                    this.addChild(this.childNodes[view.name]);
+                }
+            });
+        }
+    }
+    
+    render(stdout:HTMLElement) {
         try {
             if (DEBUG && this.name) {
-                console.log(`DOMContainer(<${this.tag} name="${this.name}"/>).render(${this.renderId})`);
+                this.app.handler.log(`DOMElement(<${ this.tag } name="${this.name}"/>).render(${ this.renderId })`);
             }
-            this.renderId++;
-            this.updateProps();
-            if (this.props.step === 1 && !this.step1) {
-                this.step1 = Step1View(this.application);
-            } else if (this.props.step === 2 && !this.step2) {
-                this.step2 = Step2View(this.application);
-            }
-            if (this.props.loaded) {
-                super.render(stdout);
-            } else {
-                this.element.innerHTML = '<div id="loading">Loading..</div>';
-                this.output(stdout);
-            }
+            super.render(stdout);
         } catch (e) {
-            console.error(`DOMContainer(<${ this.tag } name="${this.name}"/>).render(${ this.renderId }) -> ${ e.message }`);
+            this.app.handler.throw(`DOMContainer(<${this.tag} name="${this.name}"/>).render(${this.renderId}) -> ${e.message}`)
         }
     }
 }

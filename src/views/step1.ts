@@ -1,29 +1,30 @@
 /**
  * TypeScript Application - Secondary view factory function.
  *
- * 1.0.0 # Aleksandr Vorkunov <developing@nodes-tech.ru>
+ * 1.0.1 # Aleksandr Vorkunov <developing@nodes-tech.ru>
  */
 
 import DOMElement from "../components/element";
-import App, { IAppState } from "../app";
+import App from "../app";
+import { IAppState } from "../interfaces";
 import DOMAutoComplete from "../components/autocomplete";
+// @ts-ignore
+const DEBUG: boolean = process.env && process.env.DEBUG && process.env.DEBUG == "true";
 
-const DEBUG: boolean = process.env && process.env.DEBUG && process.env.DEBUG === "true" ? true : false;
-
-const Step1View = (app:App) => {
+const Step1View = (app:App, parent:DOMElement) => {
     try {
         if (DEBUG) {
-            console.log("App.Step1View()");
+            app.handler.log("App.Step1View()");
         }
         const fout = new DOMElement(
             app,
             `div`,
-            app.stdin,
-            "step1",
+            parent,
+            "Step1View",
             null,
             {}
         );
-        app.stdin.addChild(fout);
+        parent.addChild(fout);
         fout.addChild(new DOMElement(
             app,
             `label`,
@@ -93,7 +94,7 @@ const Step1View = (app:App) => {
         ));
         return fout;
     } catch (e) {
-        console.error(`App.Step1View() -> ${ e.message }`);
+        app.handler.error(`App.Step1View() -> ${ e.message }`);
     }
 };
 

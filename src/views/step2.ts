@@ -1,29 +1,30 @@
 /**
  * TypeScript Application - Secondary view factory function.
  *
- * 1.0.0 # Aleksandr Vorkunov <developing@nodes-tech.ru>
+ * 1.0.1 # Aleksandr Vorkunov <developing@nodes-tech.ru>
  */
 
 import DOMElement from "../components/element";
-import App, { IAppState } from "../app";
+import App from "../app";
 import DOMSelect from "../components/select";
+import {IAppState} from "../interfaces";
+// @ts-ignore
+const DEBUG: boolean = process.env && process.env.DEBUG && process.env.DEBUG == "true";
 
-const DEBUG: boolean = process.env && process.env.DEBUG && process.env.DEBUG === "true" ? true : false;
-
-const Step2View = (app:App):DOMElement => {
+const Step2View = (app:App, parent:DOMElement):DOMElement => {
     try {
         if (DEBUG) {
-            console.log("App.Step2View()");
+            app.handler.log("App.Step2View()");
         }
         const fout = new DOMElement(
             app,
             `div`,
-            app.stdin,
-            "step2",
+            parent,
+            "Step2View",
             null,
             {}
         );
-        app.stdin.addChild(fout);
+        parent.addChild(fout);
         fout.addChild(new DOMElement(
             app,
             `label`,
@@ -98,14 +99,14 @@ const Step2View = (app:App):DOMElement => {
                     type: "submit",
                     onClick: (e:Event) => {
                         // @ts-ignore
-                        console.error(e.target.ref.props.data);
+                        app.handler.error(e.target.ref.props.data);
                     }
                 }
             )
         );
         return fout;
     } catch (e) {
-        console.error(`App.Step2View() -> ${ e.message }`);
+        app.handler.error(`App.Step2View() -> ${ e.message }`);
     }
 };
 

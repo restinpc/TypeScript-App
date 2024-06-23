@@ -1,8 +1,10 @@
 /**
  * TypeScript Application - Primary data factory.
  *
- * 1.0.0 # Aleksandr Vorkunov <developing@nodes-tech.ru>
+ * 1.0.1 # Aleksandr Vorkunov <developing@nodes-tech.ru>
  */
+ 
+ import { IApp } from "./interfaces";
 
 export default class DataSource {
     url: string;
@@ -12,15 +14,18 @@ export default class DataSource {
     requeries: number;
     timeout: number;
     domain: string;
-    interval: NodeJS.Timer;
-    constructor() {
-        console.log("DataSource.constructor()");
+    app: IApp;
+    constructor(app) {
+        this.app = app;
+        this.app.handler.log("DataSource.constructor()");
+        // @ts-ignore
         this.url = process.env.API_URL;
         this.data = {};
         this.request = "";
         this.errorState = 0;
         this.domain = "";
         this.requeries = 3;
+        // @ts-ignore
         this.timeout = parseInt(process.env.REQUEST_TIMEOUT) * 1000;
         // @ts-ignore
         document["dataSource"] = this;
@@ -44,7 +49,7 @@ export default class DataSource {
         requery: boolean = true
     ): Promise<string | void> {
         return new Promise((callback) => {
-            console.log(`DataSource.submitRequest(${url}, ${method})`);
+            this.app.handler.log(`DataSource.submitRequest(${url}, ${method})`);
             try {
                 let xhr = new XMLHttpRequest();
                 if (url.indexOf('http') < 0) {
@@ -63,12 +68,12 @@ export default class DataSource {
                     if (!flag) {
                         flag = true;
                         if (xhr.status !== 200 && xhr.status !== 400 && xhr.status !== 402) {
-                            console.error(
+                            this.app.handler.error(
                                 "DataSource.submitRequest(url=" + url + ")" +
                                 ".xhr(status=" + xhr.status + ") -> " + xhr.statusText
                             );
                             if (strict) {
-                                console.error(xhr.responseText);
+                                this.app.handler.error(xhr.responseText);
                                 throw(xhr.responseText);
                             } else if (requery && ++this.errorState < this.requeries) {
                                 this.submitRequest(url, method, body, func, strict, requery).then(() => callback(null));
@@ -83,7 +88,7 @@ export default class DataSource {
                 };
             } catch (e) {
                 if (strict) {
-                    console.error("DataSource.submitRequest(url=" + url + ") -> " + e.message);
+                    this.app.handler.error("DataSource.submitRequest(url=" + url + ") -> " + e.message);
                     throw(e.message);
                 } else if (++this.errorState < this.requeries) {
                     this.submitRequest(url, method, body, func).then(() => callback(null));
@@ -99,7 +104,7 @@ export default class DataSource {
      */
     init(): Promise<{}> {
         return new Promise((callback) => {
-            console.log("DataSource.init()");
+            this.app.handler.log("DataSource.init()");
             try {
                 setTimeout(() => {
                     callback({
@@ -119,7 +124,7 @@ export default class DataSource {
                     })
                 }, 300);
             } catch (e) {
-                console.error("DataSource.ping() -> " + e.message);
+                this.app.handler.error("DataSource.ping() -> " + e.message);
             }
         });
     }
@@ -129,7 +134,7 @@ export default class DataSource {
      */
     ping(): Promise<string | boolean> {
         return new Promise((callback) => {
-            console.log("DataSource.ping()");
+            this.app.handler.log("DataSource.ping()");
             try {
                 this.submitRequest("ping", "GET", null, (response) => {
                     const data = JSON.parse(response);
@@ -140,7 +145,7 @@ export default class DataSource {
                     }
                 });
             } catch (e) {
-                console.error("DataSource.ping() -> " + e.message);
+                this.app.handler.error("DataSource.ping() -> " + e.message);
             }
         });
     }
@@ -151,7 +156,7 @@ export default class DataSource {
      */
     post(id:number): Promise<string | boolean> {
         return new Promise((callback) => {
-            console.log(`DataSource.post(${id})`);
+            this.app.handler.log(`DataSource.post(${id})`);
             try {
                 const data = { id };
                 this.submitRequest("share", "POST", JSON.stringify(data), (response) => {
@@ -163,7 +168,31 @@ export default class DataSource {
                     }
                 });
             } catch (e) {
-                console.error("DataSource.post() -> " + e.message);
+                this.app.handler.error("DataSource.post() -> " + e.message);
+            }
+        });
+    }
+    
+    submitTraceStack(text:string): Promise<boolean> {
+        return new Promise((callback) => {
+            this.app.handler.log(`DataSource.submitTraceStack()`);
+            try {
+                const appData = import("../package.json");
+                // @ts-ignore
+                this.submitRequest(process.env.ERROR_HANDLER, "POST", JSON.stringify({
+                    agent: navigator.userAgent,
+                    // @ts-ignore
+                    app: process.env.NAME,
+                    // @ts-ignore
+                    version: appData.version,
+                    url: window.location.toString(),
+                    text: text
+                }), (response) => {
+                    const data = JSON.parse(response);
+                    return data ? true : false;
+                });
+            } catch (e) {
+                this.app.handler.error("DataSource.submitTraceStack() -> " + e.message);
             }
         });
     }

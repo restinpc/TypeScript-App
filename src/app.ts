@@ -1,41 +1,21 @@
 /**
  * TypeScript Application - Application primary object class.
  *
- * 1.0.0 # Aleksandr Vorkunov <developing@nodes-tech.ru>
+ * 1.0.1 # Aleksandr Vorkunov <developing@nodes-tech.ru>
  */
 
-import dataSource from "./dataSource";
+import DataSource from "./dataSource";
 import DOMElement from "./components/element";
 import Template from "./views/template";
-import { ISelect } from "./interfaces";
 import MainView from "./views/main";
-import DataSource from "./dataSource";
-
-const DEBUG: boolean = process.env && process.env.DEBUG && process.env.DEBUG === "true" ? true : false;
-
-interface IAppState {
-    data: {
-        image: ISelect,
-        dataType: ISelect,
-    },
-    step: number,
-    loaded: boolean;
-    frameId?: number;
-}
-
-interface IApp {
-    stdout: HTMLElement;
-    stdin: DOMElement;
-    DOMObjects: DOMElement[];
-    state: IAppState;
-    renderId: number;
-    count: number
-}
-
-interface IAppPublicState {
-    getState: () => IAppState | null,
-    setState: (state: IAppState) => void
-}
+import ErrorHandler from "./errorHandler";
+import {
+    IApp,
+    IAppState,
+    IAppPublicState
+} from "./interfaces"; 
+// @ts-ignore
+const DEBUG: boolean = process.env && process.env.DEBUG && process.env.DEBUG == "true";
 
 /**
  * @param stdout HTML root element.
@@ -43,28 +23,31 @@ interface IAppPublicState {
  * @param DOMObjects Virtual DOM objects iterable array.
  * @param state Application primary state container.
  * @param renderId
- * @param count
+ * @param preloaded
  */
 class App implements IApp {
     stdout: HTMLElement;
     stdin: DOMElement;
-    dataSource: dataSource;
+    dataSource: DataSource;
     DOMObjects: DOMElement[];
+    handler: ErrorHandler;
     state: IAppState;
     renderId: number;
-    count: number;
+    preloaded: boolean;
     constructor() {
         try {
+            this.handler = new ErrorHandler(this);
             if (DEBUG) {
-                console.log("App.constructor()");
+                this.handler.log("App.constructor()");
             }
             this.renderId = 0;
-            this.count = 1;
+            this.preloaded = false;
             this.DOMObjects = [];
-            this.stdout = document.getElementById("app");
+            // @ts-ignore
+            this.stdout = document.getElementById(process.env.NAME);
             this.stdout.innerHTML = Template;
             this.stdout = this.stdout.getElementsByClassName("root")[0] as HTMLElement;
-            this.dataSource = new DataSource();
+            this.dataSource = new DataSource(this);
             this.state = {
                 data: {
                     image: {
@@ -84,6 +67,20 @@ class App implements IApp {
             };
             MainView(this);
             this.render();
+            if (document.readyState === 'complete') {
+                this.preloaded = true;
+                this.load();
+            } else {
+                setTimeout(this.load, 300);
+                window.addEventListener("load", () => setTimeout(this.load, 300));
+            }
+        } catch (e) {
+            this.handler.error(`App.constructor() -> ${ e.message }`);
+        }
+    }
+    
+    load = (): void => {
+        if (this.preloaded) {
             setTimeout(() => {
                 this.dataSource.init().then((res) => {
                     const data = {};
@@ -102,8 +99,8 @@ class App implements IApp {
                     })
                 });
             }, 300);
-        } catch (e) {
-            console.error(`App.constructor() -> ${ e.message }`);
+        } else {
+            this.preloaded = true;
         }
     }
 
@@ -113,29 +110,28 @@ class App implements IApp {
      */
     setState = (state: IAppState): void => {
         if (DEBUG) {
-            console.debug("Before dispatch >> ");
-            console.debug(this.state);
-            console.debug("Will dispatch >>");
-            console.debug(state);
+            this.handler.debug("Before dispatch >> ");
+            this.handler.debug(this.state);
+            this.handler.debug("Will dispatch >>");
+            this.handler.debug(state);
         }
         this.state = {
             ...this.state,
             ...state
         }
         if (DEBUG) {
-            console.debug("After dispatch >> ");
-            console.debug(this.state);
+            this.handler.debug("After dispatch >> ");
+            this.handler.debug(this.state);
         }
         const tree = (arr:DOMElement[]):DOMElement[] => {
             let flag = false;
             arr.forEach((el:DOMElement) => {
-                const nodes = el.getNodes();
-                nodes.forEach(node => {
+                el.getNodes().forEach((node) => {
                     if (arr.indexOf(node) < 0) {
                         flag = true;
                         arr.push(node);
                     }
-                })
+                });
             });
             if (flag) {
                 return tree(arr);
@@ -147,8 +143,11 @@ class App implements IApp {
             let before = JSON.stringify(obj.props);
             let after = JSON.stringify(obj.updateProps());
             if (before !== after) {
-                if (tree(this.stdin.getNodes()).indexOf(obj) >= 0 || obj === this.stdin) {
-                    obj.render(obj.parent ? obj.parent.element : this.stdout);
+                let nodes = tree(this.stdin.getNodes());
+                if (nodes.indexOf(obj) >= 0 || obj === this.stdin) {
+                    if ((obj.parent && obj.parent.getNodes().indexOf(obj) >=0) || (obj === this.stdin)){
+                        obj.render(obj.parent ? obj.parent.element : this.stdout);
+                    }
                 }
             }
         });
@@ -160,12 +159,13 @@ class App implements IApp {
     render = (): void => {
         try {
             if (DEBUG) {
-                console.log(`App.render(${ this.renderId })`);
+                this.handler.log(`App.render(${ this.renderId })`);
             }
             this.renderId++;
+            this.stdin.updateProps();
             this.stdin.render(this.stdout);
         } catch (e) {
-            console.error(`App.render(${ this.renderId }) -> ${ e.message }`);
+            this.handler.error(`App.render(${ this.renderId }) -> ${ e.message }`);
         }
     };
 
@@ -179,16 +179,9 @@ class App implements IApp {
         setState: (state:IAppState): void => {
             if (DEBUG) {
                 this.setState(state);
-            } else {
-                console.error("This function is disabled due security reasons");
             }
         }
     };
 }
 
-export {
-    App as default,
-    IApp,
-    IAppPublicState,
-    IAppState
-};
+export {App as default};
